@@ -4,8 +4,9 @@ import time
 
 from web3 import AsyncWeb3
 from src.logs import *
-from src.constants import *
 from src.utils import *
+# you should create a file named constants.py in the src directory
+from src.constants import *
 
 from web3.providers.persistent import (
     WebSocketProvider
@@ -24,13 +25,11 @@ async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
         tx = await w3.eth.get_transaction(tx_hash)
     except Exception:
         tx = None
-    print(tx)
 
     try:
         tx_recp = await w3.eth.get_transaction_receipt(tx_hash)
     except Exception:
         tx_recp = None
-    print(tx_recp)
 
     if tx_recp is not None:
         return
@@ -38,6 +37,7 @@ async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
     if tx is None:
         return
 
+    print(tx)
     """
     To be continued...
     """
