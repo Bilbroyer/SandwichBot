@@ -5,6 +5,7 @@ import time
 from web3 import AsyncWeb3
 from src.logs import *
 from src.utils import *
+from src.parse import *
 # you should create a file named constants.py in the src directory
 from src.constants import *
 
@@ -38,6 +39,12 @@ async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
         return
 
     print(tx)
+    if not match_addresses(tx['to'], UNISWAP_V2_ROUTER_ADDRESS):
+        return
+
+    route_data = parse_univ2_router_tx(tx)
+    print(route_data)
+
     """
     To be continued...
     """
