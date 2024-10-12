@@ -20,7 +20,6 @@ async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
 
     log_trace(str_log_prefix, "received")
 
-    tx = await w3.eth.get_transaction(tx_hash)
     # get the transaction receipt
     try:
         tx = await w3.eth.get_transaction(tx_hash)
@@ -41,6 +40,8 @@ async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
     print(tx)
     if not match_addresses(tx['to'], UNISWAP_V2_ROUTER_ADDRESS):
         return
+
+    log_info(str_log_prefix, "UniswapV2 Router transaction detected")
 
     route_data = parse_univ2_router_tx(tx)
     print(route_data)
