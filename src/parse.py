@@ -16,7 +16,7 @@ def get_function_signature_mapping(abi):
 
 # Get the mapping of function signatures from the ABI
 function_signatures = get_function_signature_mapping(uniswap_v2_router_abi)
-
+print(function_signatures)
 
 # Helper function to decode UniswapV2 Router transaction data
 def parse_univ2_router_tx(tx_data):

@@ -1,6 +1,6 @@
 import asyncio
-import json
-import time
+# import json
+# import time
 
 from web3 import AsyncWeb3
 from src.logs import *
@@ -13,13 +13,17 @@ from web3.providers.persistent import (
     WebSocketProvider
 )
 
+transaction_count = 0
 
 
-async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
+async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
+    global transaction_count
     str_log_prefix = f"txhash={tx_hash.hex()}"
-
     log_trace(str_log_prefix, "received")
-
+    transaction_count += 1
+    if transaction_count % 200 == 0:
+        clear_console()
+        transaction_count = 0
     # get the transaction receipt
     try:
         tx = await w3.eth.get_transaction(tx_hash)
@@ -49,7 +53,6 @@ async def sandwich_uniswap_v2_router_tx(tx_hash, w3):
     """
     To be continued...
     """
-
 
 
 async def main():
