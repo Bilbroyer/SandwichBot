@@ -19,7 +19,7 @@ transaction_count = 0
 async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
     global transaction_count
     str_log_prefix = f"txhash={tx_hash.hex()}"
-    log_trace(str_log_prefix, "received")
+    # log_trace(str_log_prefix, "received")
     transaction_count += 1
     if transaction_count % 200 == 0:
         clear_console()
@@ -41,14 +41,18 @@ async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
     if tx is None:
         return
 
-    print(tx)
-    if not match_addresses(tx['to'], UNISWAP_V2_ROUTER_ADDRESS):
+    if not tx['to'].lower() == UNISWAP_V2_ROUTER_ADDRESS.lower():
         return
 
     log_info(str_log_prefix, "UniswapV2 Router transaction detected")
 
-    route_data = parse_univ2_router_tx(tx)
-    print(route_data)
+    tx_data = tx['input']
+
+    if len(tx_data) < 10:
+        return
+
+    route_data = parse_univ2_router_tx(tx_data)
+    log_info(str_log_prefix, f"method={route_data['method']}")
 
     """
     To be continued...
