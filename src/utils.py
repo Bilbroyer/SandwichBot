@@ -1,4 +1,4 @@
-import os, json
+import os, json, random
 from web3.auto import w3
 
 # Clear console
