@@ -33,7 +33,6 @@ chainId = 11155111
 GAS_URL = f'https://{API_KEY}:{API_SECRET}@gas.api.infura.io/v3/{API_KEY}/networks//{chainId}/suggestedGasFees'
 response = requests.get(GAS_URL)
 data = response.json()
-# gas_estimate = 2000000
 max_fee = w3.to_wei(data['medium']['suggestedMaxFeePerGas'], 'gwei')
 priority_fee = w3.to_wei(data['medium']['suggestedMaxPriorityFeePerGas'], 'gwei')
 
@@ -64,7 +63,7 @@ decimals = token_contract.functions.decimals().call()
 
 
 def approve_erc20(amount):
-    amount_to_approve = amount * (10 ** decimals)
+    amount_to_approve = int(amount * (10 ** decimals))
     balance = token_contract.functions.balanceOf(account.address).call()
     print(f"Token Balance: {balance}")
     allowance = token_contract.functions.allowance(account.address, UNISWAP_V2_TEST_ROUTER_ADDRESS).call()
@@ -95,7 +94,7 @@ def approve_erc20(amount):
 
 def add_liquidity(amount_eth, amount_token, slippage=0.01):
     # Amount values should be in the correct units
-    amount_token_desired = amount_token * (10 ** decimals)  # Example value, replace with your desired amount
+    amount_token_desired = int(amount_token * (10 ** decimals))  # Example value, replace with your desired amount
     amount_token_min = int(amount_token_desired * (1 - slippage))  # Minimum token amount to accept
     amount_eth = w3.to_wei(amount_eth, 'ether')  # Minimum ETH to accept
     amount_eth_min = int(amount_eth * (1 - slippage))  # Minimum ETH to accept
@@ -123,7 +122,7 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
         TOKEN_ADDRESS,
         amount_token_desired,
         amount_token_min,
-        amount_eth_min * 0.99,
+        amount_eth_min,
         account.address,
         deadline
     ).build_transaction({
@@ -132,7 +131,7 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
         'gas': gas_estimate,
         'maxFeePerGas': max_fee,
         'maxPriorityFeePerGas': priority_fee,
-        'value': int(amount_eth),  # ETH value to be added
+        'value': amount_eth,  # ETH value to be added
         'nonce': w3.eth.get_transaction_count(account.address),
     })
 
@@ -148,7 +147,7 @@ if __name__ == "__main__":
     amount_eth_desired = 0.1  # Example value, replace with your desired amount
     amount_token_desired = 1_000_000  # Example value, replace with your desired amount
     eth_balance = w3.eth.get_balance(account.address)
-    total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (1500000 * max_fee)  # Adjust based on your values
+    total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (1100000 * max_fee)  # Adjust based on your values
     if eth_balance < total_eth_needed:
         print(f"Insufficient ETH balance: {eth_balance} wei, needed: {total_eth_needed} wei")
         exit(1)
