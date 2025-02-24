@@ -43,6 +43,11 @@ root.withdraw()
 
 password = simpledialog.askstring("PASSWORD", "Input your password：", show='*')
 
+# account
+private_key = load_keystore(r'..\keystore.json', password).hex()
+account = w3.eth.account.from_key(private_key)
+print(f"Your wallet: {account.address}")
+
 # connect to the RPC server
 w3 = Web3(Web3.HTTPProvider(SEP_URL))
 
@@ -51,11 +56,6 @@ if w3.is_connected():
 else:
     print("Failed to connect to Ethereum")
     exit(1)
-
-# account
-private_key = load_keystore(r'..\keystore.json', password).hex()
-account = w3.eth.account.from_key(private_key)
-print(account.address)
 
 # contracts
 token_contract = w3.eth.contract(address=TOKEN_ADDRESS, abi=erc20_abi)
@@ -176,7 +176,6 @@ def main():
         elif reverses[0] == 0 or reverses[1] == 0:
             print("One of the reserves is 0.")
         else:
-            print(reverses[1] / reverses[0], amount_eth_desired / amount_token_desired)
             if reverses[1] / reverses[0] > amount_eth_desired / amount_token_desired:
                 print("The current price is different from the desired price.")
                 amount_token_desired = amount_eth_desired * reverses[0] / reverses[1]
