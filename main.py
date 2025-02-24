@@ -3,10 +3,10 @@ import asyncio
 # import time
 
 from web3 import AsyncWeb3
+from src.cache import read_cache
 from src.logs import *
 from src.utils import *
 from src.parse import *
-# you should create a file named constants.py in the src directory
 from src.constants import *
 
 from web3.providers.persistent import (
@@ -14,7 +14,8 @@ from web3.providers.persistent import (
 )
 
 transaction_count = 0
-
+# WebSocket URL, you might change it to your own RPC server. You should create the config.ini file in the src/config folder, or you can replace the WSS_URL with your own RPC server URL.
+WSS_URL = read_cache('quicknode', 'sepolia_wss', r'src\config')
 
 async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
     global transaction_count

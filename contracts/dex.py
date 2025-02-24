@@ -8,7 +8,7 @@ from tkinter import simpledialog
 import time
 import json
 
-# infura api
+# infura api from the src/config.ini file, you can replace it with your own API key and secret
 API_KEY = read_cache('infura', 'API_KEY', r'..\src\config')
 API_SECRET = read_cache('infura', 'API_SECRET', r'..\src\config')
 
@@ -23,6 +23,8 @@ with open(r'abi\UniswapV2Factory.json', 'r') as abi_file:
     factory_abi = json.load(abi_file)
 with open(r'abi\UniswapV2Router02.json', 'r') as abi_file:
     router_abi = json.load(abi_file)
+with open(r'abi\UniswapV2Pair.json', 'r') as abi_file:
+    pair_abi = json.load(abi_file)
 
 # token
 TOKEN_ADDRESS = TOKENS_TEST['YE']
@@ -62,6 +64,21 @@ router_contract = w3.eth.contract(address=UNISWAP_V2_TEST_ROUTER_ADDRESS, abi=ro
 decimals = token_contract.functions.decimals().call()
 
 
+def check_price(address1, address2, factory_contract=factory_contract):
+    pair_address = factory_contract.functions.getPair(address1, address2).call()
+
+    if pair_address == "0x0000000000000000000000000000000000000000":
+        return None
+    else:
+        print(f"Pool already exists at: {pair_address}")
+
+    pair_contract = w3.eth.contract(address=pair_address, abi=pair_abi)
+    pair_reserves = pair_contract.functions.getReserves().call()
+    reverse0, reverse1 = pair_reserves[0], pair_reserves[1]
+    print(f"The current price of token1 is: {reverse1 / reverse0} token2")
+    return pair_reserves
+
+
 def approve_erc20(amount):
     amount_to_approve = int(amount * (10 ** decimals))
     balance = token_contract.functions.balanceOf(account.address).call()
@@ -98,13 +115,6 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
     amount_token_min = int(amount_token_desired * (1 - slippage))  # Minimum token amount to accept
     amount_eth = w3.to_wei(amount_eth, 'ether')  # Minimum ETH to accept
     amount_eth_min = int(amount_eth * (1 - slippage))  # Minimum ETH to accept
-
-    pair_address = factory_contract.functions.getPair(TOKEN_ADDRESS, WETH_ADDRESS).call()
-
-    if pair_address == "0x0000000000000000000000000000000000000000":
-        print("No pool exists, the pair will be created when adding liquidity.")
-    else:
-        print(f"Pool already exists at: {pair_address}")
 
     deadline = int(time.time()) + 600  # 10-minute deadline
 
@@ -143,13 +153,52 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
     print(f"Liquidity added.{tx_receipt}")
 
 
+def swap_eth_for_exact_tokens(amount_token, amount_eth, slippage=0.01):
+    pass
+
+
+def swap_exact_tokens_for_eth(amount_token, amount_eth, slippage=0.01):
+    pass
+
+
+def main():
+    print("What do you want to do? (in uniswap v2)")
+    print("1. Add liquidity")
+    print("2. Swap ETH for tokens")
+    print("3. Swap tokens for ETH")
+    choice = input("Enter your choice: ")
+    if choice == '1':
+        amount_eth_desired = 0.1  # Example value, replace with your desired amount
+        amount_token_desired = 1_000_000  # Example value, replace with your desired amount
+        reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
+        if reverses is None:
+            print("No pool exists, the pair will be created when adding liquidity.")
+        elif reverses[0] == 0 or reverses[1] == 0:
+            print("One of the reserves is 0.")
+        else:
+            print(reverses[1] / reverses[0], amount_eth_desired / amount_token_desired)
+            if reverses[1] / reverses[0] > amount_eth_desired / amount_token_desired:
+                print("The current price is different from the desired price.")
+                amount_token_desired = amount_eth_desired * reverses[0] / reverses[1]
+                print(f"Adjusted token amount: {amount_token_desired}")
+            elif reverses[1] / reverses[0] < amount_eth_desired / amount_token_desired:
+                print("The current price is different from the desired price.")
+                amount_eth_desired = amount_token_desired * reverses[1] / reverses[0]
+                print(f"Adjusted ETH amount: {amount_eth_desired}")
+
+        eth_balance = w3.eth.get_balance(account.address)
+        token_balance = token_contract.functions.balanceOf(account.address).call()
+        total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (1100000 * max_fee)  # Adjust based on your values
+        if eth_balance < total_eth_needed:
+            print(f"Insufficient ETH balance: {eth_balance} wei, needed: {total_eth_needed} wei")
+            exit(1)
+        elif token_balance < amount_token_desired * (10 ** decimals):
+            print(f"Insufficient token balance: {token_balance}, needed: {amount_token_desired}")
+            exit(1)
+        approve_erc20(amount_token_desired)
+        add_liquidity(amount_eth_desired, amount_token_desired)
+    elif choice == '2':
+        pass
+
 if __name__ == "__main__":
-    amount_eth_desired = 0.1  # Example value, replace with your desired amount
-    amount_token_desired = 1_000_000  # Example value, replace with your desired amount
-    eth_balance = w3.eth.get_balance(account.address)
-    total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (1100000 * max_fee)  # Adjust based on your values
-    if eth_balance < total_eth_needed:
-        print(f"Insufficient ETH balance: {eth_balance} wei, needed: {total_eth_needed} wei")
-        exit(1)
-    approve_erc20(amount_token_desired)
-    add_liquidity(amount_eth_desired, amount_token_desired)
+    main()
