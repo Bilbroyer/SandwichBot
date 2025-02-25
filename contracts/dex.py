@@ -2,9 +2,11 @@ from web3 import Web3
 from src.utils import *
 from src.cache import read_cache
 from src.constants import *
+from src.logs import *
 import requests
 import tkinter as tk
 from tkinter import simpledialog
+from decimal import Decimal, getcontext, InvalidOperation
 import time
 import json
 
@@ -19,6 +21,14 @@ chainId = 11155111
 ETH_URL = f"https://{API_KEY}:{API_SECRET}@mainnet.infura.io/v3/{API_KEY}"
 SEP_URL = f'https://{API_KEY}:{API_SECRET}@sepolia.infura.io/v3/{API_KEY}'
 GAS_URL = f'https://{API_KEY}:{API_SECRET}@gas.api.infura.io/v3/{API_KEY}/networks//{chainId}/suggestedGasFees'
+
+# precision adjustment
+"""
+Format statement: 
+All numbers in the transaction are int, Decimal in the user input, and float is prohibited in transaction amount.
+If division is involved, all numbers involved in the operation should be changed beforehand to Decimal.
+"""
+getcontext().prec = 28
 
 # abi
 with open(r'abi\ERC20.json', 'r') as abi_file:
@@ -60,10 +70,20 @@ router_contract = w3.eth.contract(address=UNISWAP_V2_TEST_ROUTER_ADDRESS, abi=ro
 decimals = token_contract.functions.decimals().call()
 
 
+def amount_input(clue):
+    quantity = input(clue)
+    try:
+        quantity = Decimal(quantity)
+    except InvalidOperation:
+        print("Invalid amount")
+        exit(1)
+    return quantity
+
+
 def get_gas_price(priority='medium'):
     response = requests.get(GAS_URL)
     data = response.json()
-    print(f"Current gas price: {data[priority]['suggestedMaxFeePerGas']} gwei")
+    log_info(f"Current gas price: {data[priority]['suggestedMaxFeePerGas']} gwei")
     max_fee = w3.to_wei(data[priority]['suggestedMaxFeePerGas'], 'gwei')
     priority_fee = w3.to_wei(data[priority]['suggestedMaxPriorityFeePerGas'], 'gwei')
     wait_time = data[priority]['maxWaitTimeEstimate']
@@ -71,8 +91,8 @@ def get_gas_price(priority='medium'):
 
 
 def sign(tx):
-    eth_cost_most = tx.get('maxFeePerGas', 0) * tx.get('gas', 0) + tx.get('value', 0)
-    print(f"Estimated max cost: {eth_cost_most / 10 ** 18} eth. Are you sure to continue?[y/n]")
+    eth_cost_most = Decimal(tx.get('maxFeePerGas', 0) * tx.get('gas', 0) + tx.get('value', 0))
+    log_fatal(f"Estimated max cost: {eth_cost_most / Decimal(10 ** 18)} eth. Are you sure to continue?[y/n]")
     if input() != 'y':
         print("Transaction cancelled.")
         return None
@@ -93,7 +113,7 @@ def transfer(amount, to_address):
     balance = w3.eth.get_balance(account.address)
     gas_fee = get_gas_price()
     print(f"ETH Balance: {balance}")
-    if balance < amount_to_transfer + 21000 * gas_fee[1]:
+    if balance < amount_to_transfer + 21000 * gas_fee[1]:  # check if you have enough balance, including the gas fee
         print(f"Insufficient balance: {balance} wei, needed: {amount_to_transfer} wei")
         return
     else:
@@ -114,11 +134,14 @@ def transfer(amount, to_address):
 
 def transfer_erc20(amount, to_address, contract=token_contract):
     amount_to_transfer = int(amount * (10 ** decimals))
-    balance = contract.functions.balanceOf(account.address).call()
+    balance_token = contract.functions.balanceOf(account.address).call()
+    balance = w3.eth.get_balance(account.address)
     gas_fee = get_gas_price()
-    print(f"Token Balance: {balance}")
-    if balance < amount_to_transfer + 50000 * gas_fee[1]:
-        print(f"Insufficient balance: {balance}, needed: {amount_to_transfer}")
+    print(f"Token Balance: {balance_token}")
+    if balance_token < amount_to_transfer or 50000 * gas_fee[
+        1] < balance:  # check if you have enough balance, including the gas fee
+        print(
+            f"Insufficient balance: {balance_token} token, needed: {amount_to_transfer} token; {balance} wei, needed: {50000 * gas_fee[1]} wei")
         return
     else:
         print("Transferring tokens...")
@@ -146,9 +169,10 @@ def check_price(address1, address2, contract=factory_contract):
 
     pair_contract = w3.eth.contract(address=pair_address, abi=pair_abi)
     pair_reserves = pair_contract.functions.getReserves().call()
-    reverse0, reverse1 = pair_reserves[0], pair_reserves[1]
+    # reverse is supposed to be an integer. In order to meet the precision requirement, we need to convert it to Decimal
+    reverse0, reverse1 = Decimal(pair_reserves[0]), Decimal(pair_reserves[1])
     print(f"The current price of token1 is: {reverse1 / reverse0} token2")
-    return pair_reserves
+    return [reverse0, reverse1]
 
 
 def approve_erc20(amount, address=UNISWAP_V2_TEST_ROUTER_ADDRESS):
@@ -236,38 +260,29 @@ def main():
     print("5. Swap tokens for ETH")
     choice = input("Enter your choice: ")
     if choice == '1':
-        amount_eth = input("Enter the amount of ETH to transfer: ")
-        try:
-            amount_eth = float(amount_eth)
-        except (ValueError, TypeError):
-            print("Invalid amount")
-            exit(1)
+        amount_eth = amount_input("Enter the amount of ETH to transfer: ")
         to_address = input("Enter the recipient's address: ")
-        if not w3.is_checksum_address(to_address):
+        if not w3.is_checksum_address(to_address):  # ensure no typos in your address
             print("Invalid address")
             exit(1)
         transfer(amount_eth, to_address)
     elif choice == '2':
-        amount_token = input("Enter the amount of tokens to transfer: ")
-        try:
-            amount_token = float(amount_token)
-        except (ValueError, TypeError):
-            print("Invalid amount")
-            exit(1)
+        amount_token = amount_input("Enter the amount of tokens to transfer: ")
         to_address = input("Enter the recipient's address: ")
-        if not w3.is_checksum_address(to_address):
+        if not w3.is_checksum_address(to_address):  # ensure no typos in your address
             print("Invalid address")
             exit(1)
         transfer_erc20(amount_token, to_address)
     elif choice == '3':
-        amount_eth_desired = 0.1  # Example value, replace with your desired amount
-        amount_token_desired = 1_000_000  # Example value, replace with your desired amount
+        amount_eth_desired = amount_input("Enter the amount of ETH to add: ")
+        amount_token_desired = amount_input("Enter the amount of tokens to add: ")
         reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
         if reverses is None:
             print("No pool exists, the pair will be created when adding liquidity.")
         elif reverses[0] == 0 or reverses[1] == 0:
             print("One of the reserves is 0.")
         else:
+            # Check if the current price is different from the desired price, and adjust the amount accordingly
             if reverses[1] / reverses[0] > amount_eth_desired / amount_token_desired:
                 print("The current price is different from the desired price.")
                 amount_token_desired = amount_eth_desired * reverses[0] / reverses[1]
