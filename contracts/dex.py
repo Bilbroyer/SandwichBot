@@ -12,9 +12,13 @@ import json
 API_KEY = read_cache('infura', 'API_KEY', r'..\src\config')
 API_SECRET = read_cache('infura', 'API_SECRET', r'..\src\config')
 
+# chain id
+chainId = 11155111
+
 # RPC url
 ETH_URL = f"https://{API_KEY}:{API_SECRET}@mainnet.infura.io/v3/{API_KEY}"
 SEP_URL = f'https://{API_KEY}:{API_SECRET}@sepolia.infura.io/v3/{API_KEY}'
+GAS_URL = f'https://{API_KEY}:{API_SECRET}@gas.api.infura.io/v3/{API_KEY}/networks//{chainId}/suggestedGasFees'
 
 # abi
 with open(r'abi\ERC20.json', 'r') as abi_file:
@@ -29,14 +33,6 @@ with open(r'abi\UniswapV2Pair.json', 'r') as abi_file:
 # token
 TOKEN_ADDRESS = TOKENS_TEST['YE']
 WETH_ADDRESS = TOKENS_TEST['WETH']
-
-# gas price
-chainId = 11155111
-GAS_URL = f'https://{API_KEY}:{API_SECRET}@gas.api.infura.io/v3/{API_KEY}/networks//{chainId}/suggestedGasFees'
-response = requests.get(GAS_URL)
-data = response.json()
-max_fee = w3.to_wei(data['medium']['suggestedMaxFeePerGas'], 'gwei')
-priority_fee = w3.to_wei(data['medium']['suggestedMaxPriorityFeePerGas'], 'gwei')
 
 root = tk.Tk()
 root.withdraw()
@@ -64,8 +60,84 @@ router_contract = w3.eth.contract(address=UNISWAP_V2_TEST_ROUTER_ADDRESS, abi=ro
 decimals = token_contract.functions.decimals().call()
 
 
-def check_price(address1, address2, factory_contract=factory_contract):
-    pair_address = factory_contract.functions.getPair(address1, address2).call()
+def get_gas_price(priority='medium'):
+    response = requests.get(GAS_URL)
+    data = response.json()
+    print(f"Current gas price: {data[priority]['suggestedMaxFeePerGas']} gwei")
+    max_fee = w3.to_wei(data[priority]['suggestedMaxFeePerGas'], 'gwei')
+    priority_fee = w3.to_wei(data[priority]['suggestedMaxPriorityFeePerGas'], 'gwei')
+    wait_time = data[priority]['maxWaitTimeEstimate']
+    return [wait_time, max_fee, priority_fee]
+
+
+def sign(tx):
+    eth_cost_most = tx.get('maxFeePerGas', 0) * tx.get('gas', 0) + tx.get('value', 0)
+    print(f"Estimated max cost: {eth_cost_most / 10 ** 18} eth. Are you sure to continue?[y/n]")
+    if input() != 'y':
+        print("Transaction cancelled.")
+        return None
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    print(f"Transaction sent: {tx_hash.hex()}")
+    print(f"Waiting for the transaction to be deployed...")
+    try:
+        tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    except Exception as e:
+        print(f"Transaction failed: {e}")
+        return None
+    return tx_receipt
+
+
+def transfer(amount, to_address):
+    amount_to_transfer = w3.to_wei(amount, 'ether')
+    balance = w3.eth.get_balance(account.address)
+    gas_fee = get_gas_price()
+    print(f"ETH Balance: {balance}")
+    if balance < amount_to_transfer + 21000 * gas_fee[1]:
+        print(f"Insufficient balance: {balance} wei, needed: {amount_to_transfer} wei")
+        return
+    else:
+        print("Transferring ETH...")
+    tx = {
+        'from': account.address,
+        'nonce': w3.eth.get_transaction_count(account.address),
+        'to': to_address,
+        'value': amount_to_transfer,
+        'gas': 21000,
+        'maxFeePerGas': gas_fee[1],
+        'maxPriorityFeePerGas': gas_fee[2],
+        'chainId': chainId,
+    }
+    tx_receipt = sign(tx)
+    print(f"Transaction has been confirmed. {tx_receipt}") if tx_receipt is not None else print("Check the error.")
+
+
+def transfer_erc20(amount, to_address, contract=token_contract):
+    amount_to_transfer = int(amount * (10 ** decimals))
+    balance = contract.functions.balanceOf(account.address).call()
+    gas_fee = get_gas_price()
+    print(f"Token Balance: {balance}")
+    if balance < amount_to_transfer + 50000 * gas_fee[1]:
+        print(f"Insufficient balance: {balance}, needed: {amount_to_transfer}")
+        return
+    else:
+        print("Transferring tokens...")
+    # gas_estimate = token_contract.functions.transfer(to_address, amount_to_transfer).estimate_gas()
+    gas_estimate = 50000  # I don't know why the estimate_gas() method is not working in test net
+    tx = token_contract.functions.transfer(to_address, amount_to_transfer).build_transaction({
+        'from': account.address,
+        'chainId': chainId,
+        'gas': gas_estimate,
+        'maxFeePerGas': gas_fee[1],
+        'maxPriorityFeePerGas': gas_fee[2],
+        'nonce': w3.eth.get_transaction_count(account.address),
+    })
+    tx_receipt = sign(tx)
+    print(f"Transaction has been confirmed. {tx_receipt}") if tx_receipt is not None else print("Check the error.")
+
+
+def check_price(address1, address2, contract=factory_contract):
+    pair_address = contract.functions.getPair(address1, address2).call()
 
     if pair_address == "0x0000000000000000000000000000000000000000":
         return None
@@ -79,34 +151,33 @@ def check_price(address1, address2, factory_contract=factory_contract):
     return pair_reserves
 
 
-def approve_erc20(amount):
+def approve_erc20(amount, address=UNISWAP_V2_TEST_ROUTER_ADDRESS):
     amount_to_approve = int(amount * (10 ** decimals))
     balance = token_contract.functions.balanceOf(account.address).call()
     print(f"Token Balance: {balance}")
-    allowance = token_contract.functions.allowance(account.address, UNISWAP_V2_TEST_ROUTER_ADDRESS).call()
+    allowance = token_contract.functions.allowance(account.address, address).call()
     print(f"Current allowance: {allowance}")
     if allowance >= amount_to_approve:
         print("Already approved")
         return
     else:
         print("Approving tokens...")
-    # gas_estimate = token_contract.functions.approve(UNISWAP_V2_TEST_ROUTER_ADDRESS, amount_to_approve).estimate_gas()
+    # gas_estimate = token_contract.functions.approve(address, amount_to_approve).estimate_gas()
     gas_estimate = 100000  # I don't know why the estimate_gas() method is not working in test net
-    tx = token_contract.functions.approve(UNISWAP_V2_TEST_ROUTER_ADDRESS, amount_to_approve).build_transaction({
+    gas_fee = get_gas_price()
+    tx = token_contract.functions.approve(address, amount_to_approve).build_transaction({
         'from': account.address,
         'chainId': chainId,
         'gas': gas_estimate,
-        'maxFeePerGas': max_fee,
-        'maxPriorityFeePerGas': priority_fee,
+        'maxFeePerGas': gas_fee[1],
+        'maxPriorityFeePerGas': gas_fee[2],
         'nonce': w3.eth.get_transaction_count(account.address),
     })
 
-    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
-    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-    print(f"Transaction sent: {tx_hash.hex()}")
-    print(f"Waiting for the transaction to be deployed...")
-    tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    print(f"Approved {amount_to_approve} tokens to Uniswap V2 Router.{tx_receipt}")
+    tx_receipt = sign(tx)
+    print(
+        f"Approved {amount_to_approve} tokens to Uniswap V2 Router. {tx_receipt}") if tx_receipt is not None else print(
+        "Check the error.")
 
 
 def add_liquidity(amount_eth, amount_token, slippage=0.01):
@@ -115,8 +186,6 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
     amount_token_min = int(amount_token_desired * (1 - slippage))  # Minimum token amount to accept
     amount_eth = w3.to_wei(amount_eth, 'ether')  # Minimum ETH to accept
     amount_eth_min = int(amount_eth * (1 - slippage))  # Minimum ETH to accept
-
-    deadline = int(time.time()) + 600  # 10-minute deadline
 
     # gas_estimate = router_contract.functions.addLiquidityETH(
     #     TOKEN_ADDRESS,
@@ -127,7 +196,8 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
     #     deadline
     # ).estimate_gas()
     gas_estimate = 1000000
-
+    gas_fee = get_gas_price()
+    deadline = int(time.time() + gas_fee[0] / 500)
     tx = router_contract.functions.addLiquidityETH(
         TOKEN_ADDRESS,
         amount_token_desired,
@@ -139,18 +209,14 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
         'from': account.address,
         'chainId': chainId,
         'gas': gas_estimate,
-        'maxFeePerGas': max_fee,
-        'maxPriorityFeePerGas': priority_fee,
+        'maxFeePerGas': gas_fee[1],
+        'maxPriorityFeePerGas': gas_fee[2],
         'value': amount_eth,  # ETH value to be added
         'nonce': w3.eth.get_transaction_count(account.address),
     })
 
-    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
-    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-    print(f"Transaction sent: {tx_hash.hex()}")
-    print(f"Waiting for the transaction to be deployed...")
-    tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    print(f"Liquidity added.{tx_receipt}")
+    tx_receipt = sign(tx)
+    print(f"Liquidity added. {tx_receipt}") if tx_receipt is not None else print("Check the error.")
 
 
 def swap_eth_for_exact_tokens(amount_token, amount_eth, slippage=0.01):
@@ -163,11 +229,37 @@ def swap_exact_tokens_for_eth(amount_token, amount_eth, slippage=0.01):
 
 def main():
     print("What do you want to do? (in uniswap v2)")
-    print("1. Add liquidity")
-    print("2. Swap ETH for tokens")
-    print("3. Swap tokens for ETH")
+    print("1. transfer ETH")
+    print("2. transfer ERC20 tokens")
+    print("3. Add liquidity")
+    print("4. Swap ETH for tokens")
+    print("5. Swap tokens for ETH")
     choice = input("Enter your choice: ")
     if choice == '1':
+        amount_eth = input("Enter the amount of ETH to transfer: ")
+        try:
+            amount_eth = float(amount_eth)
+        except (ValueError, TypeError):
+            print("Invalid amount")
+            exit(1)
+        to_address = input("Enter the recipient's address: ")
+        if not w3.is_checksum_address(to_address):
+            print("Invalid address")
+            exit(1)
+        transfer(amount_eth, to_address)
+    elif choice == '2':
+        amount_token = input("Enter the amount of tokens to transfer: ")
+        try:
+            amount_token = float(amount_token)
+        except (ValueError, TypeError):
+            print("Invalid amount")
+            exit(1)
+        to_address = input("Enter the recipient's address: ")
+        if not w3.is_checksum_address(to_address):
+            print("Invalid address")
+            exit(1)
+        transfer_erc20(amount_token, to_address)
+    elif choice == '3':
         amount_eth_desired = 0.1  # Example value, replace with your desired amount
         amount_token_desired = 1_000_000  # Example value, replace with your desired amount
         reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
@@ -187,7 +279,8 @@ def main():
 
         eth_balance = w3.eth.get_balance(account.address)
         token_balance = token_contract.functions.balanceOf(account.address).call()
-        total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (1100000 * max_fee)  # Adjust based on your values
+        total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (
+                1100000 * get_gas_price()[1])  # Adjust based on your values
         if eth_balance < total_eth_needed:
             print(f"Insufficient ETH balance: {eth_balance} wei, needed: {total_eth_needed} wei")
             exit(1)
@@ -196,8 +289,9 @@ def main():
             exit(1)
         approve_erc20(amount_token_desired)
         add_liquidity(amount_eth_desired, amount_token_desired)
-    elif choice == '2':
+    elif choice == '4':
         pass
+
 
 if __name__ == "__main__":
     main()

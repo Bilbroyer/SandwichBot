@@ -4,7 +4,7 @@ from colorama import init, Fore, Style
 import sys
 import datetime
 
-# 初始化 colorama
+# initiate colorama
 init(autoreset=True)
 
 def log_warn(*args):
