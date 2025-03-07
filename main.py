@@ -1,21 +1,46 @@
 import asyncio
-# import json
 # import time
 
+from dotenv import load_dotenv
 from web3 import AsyncWeb3
-from src.cache import read_cache
 from src.logs import *
 from src.utils import *
 from src.parse import *
-from src.constants import *
-
 from web3.providers.persistent import (
     WebSocketProvider
 )
 
+load_dotenv()  # Automatically loads from the root .env file
+
+with open("config.json") as config_file:
+    config = json.load(config_file)
+
+RPC_PROVIDER = config["rpc_provider"]
+NETWORK = config["network"]
+CHAIN_ID = config["chain_id"]
+
+INFURA_API_KEY = os.getenv("infura_api_key")
+
+# WSS provider URLs
+WSS_PROVIDERS = {
+    "mainnet": {
+        "infura": f"wss://mainnet.infura.io/ws/v3/{INFURA_API_KEY}",
+        "quicknode": os.getenv("quicknode_mainnet_wss"),
+        "google": os.getenv("google_mainnet_wss")
+    },
+    "sepolia": {
+        "infura": f"wss://sepolia.infura.io/ws/v3/{INFURA_API_KEY}",
+        "quicknode": os.getenv("quicknode_sepolia_wss"),
+        "google": os.getenv("google_sepolia_wss")
+    }
+}
+
+
+WSS_URL = (WSS_PROVIDERS.get(NETWORK, "mainnet")).get(RPC_PROVIDER, "infura")  # Your RPC URL
+UNISWAP_V2_ROUTER_ADDRESS = os.getenv("UNISWAP_V2_ROUTER_ADDRESS")  # UniswapV2 Router address
+
 transaction_count = 0
-# WebSocket URL, you might change it to your own RPC server. You should create the config.ini file in the src/config folder, or you can replace the WSS_URL with your own RPC server URL.
-WSS_URL = read_cache('quicknode', 'sepolia_wss', r'src\config')
+
 
 async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
     global transaction_count

@@ -1,26 +1,39 @@
 from web3 import Web3
+from dotenv import load_dotenv
 from src.utils import *
-from src.cache import read_cache
-from src.constants import *
 from src.logs import *
 import requests
 import tkinter as tk
 from tkinter import simpledialog
 from decimal import Decimal, getcontext, InvalidOperation
 import time
-import json
 
-# infura api from the src/config.ini file, you can replace it with your own API key and secret
-API_KEY = read_cache('infura', 'API_KEY', r'..\src\config')
-API_SECRET = read_cache('infura', 'API_SECRET', r'..\src\config')
+load_dotenv()  # Automatically loads from the root .env file
 
-# chain id
-chainId = 11155111
+with open(r"..\config.json") as config_file:
+    config = json.load(config_file)
+
+RPC_PROVIDER = config["rpc_provider"]
+NETWORK = config["network"]
+CHAIN_ID = config["chain_id"]
+
+INFURA_API_KEY = os.getenv("infura_api_key")
 
 # RPC url
-ETH_URL = f"https://{API_KEY}:{API_SECRET}@mainnet.infura.io/v3/{API_KEY}"
-SEP_URL = f'https://{API_KEY}:{API_SECRET}@sepolia.infura.io/v3/{API_KEY}'
-GAS_URL = f'https://{API_KEY}:{API_SECRET}@gas.api.infura.io/v3/{API_KEY}/networks//{chainId}/suggestedGasFees'
+RPC_PROVIDERS = {
+    "mainnet": {
+        "infura": f'https://mainnet.infura.io/v3/{INFURA_API_KEY}',
+        "quicknode": os.getenv("quicknode_mainnet_url"),
+        "google": os.getenv("google_mainnet_url")
+    },
+    "sepolia": {
+        "infura": f'https://sepolia.infura.io/v3/{INFURA_API_KEY}',
+        "quicknode": os.getenv("quicknode_sepolia_url"),
+        "google": os.getenv("google_sepolia_url")
+    }
+}
+RPC_URL = (RPC_PROVIDERS.get(NETWORK, "mainnet")).get(RPC_PROVIDER, "infura")  # Your RPC URL
+GAS_URL = f'https://gas.api.infura.io/v3/{INFURA_API_KEY}/networks//{CHAIN_ID}/suggestedGasFees'
 
 # precision adjustment
 """
@@ -40,9 +53,12 @@ with open(r'abi\UniswapV2Router02.json', 'r') as abi_file:
 with open(r'abi\UniswapV2Pair.json', 'r') as abi_file:
     pair_abi = json.load(abi_file)
 
-# token
-TOKEN_ADDRESS = TOKENS_TEST['YE']
-WETH_ADDRESS = TOKENS_TEST['WETH']
+# address
+TOKEN_ADDRESS = os.getenv("YE")
+WETH_ADDRESS = os.getenv("WETH")
+UNISWAP_ROUTER = os.getenv("UNISWAP_V2_TEST_ROUTER_ADDRESS")
+UNISWAP_FACTORY = os.getenv("UNISWAP_V2_TEST_FACTORY_ADDRESS")
+
 
 root = tk.Tk()
 root.withdraw()
@@ -55,7 +71,7 @@ account = w3.eth.account.from_key(private_key)
 print(f"Your wallet: {account.address}")
 
 # connect to the RPC server
-w3 = Web3(Web3.HTTPProvider(SEP_URL))
+w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
 if w3.is_connected():
     print("Connected to RPC server")
@@ -65,8 +81,8 @@ else:
 
 # contracts
 token_contract = w3.eth.contract(address=TOKEN_ADDRESS, abi=erc20_abi)
-factory_contract = w3.eth.contract(address=UNISWAP_V2_TEST_FACTORY_ADDRESS, abi=factory_abi)
-router_contract = w3.eth.contract(address=UNISWAP_V2_TEST_ROUTER_ADDRESS, abi=router_abi)
+factory_contract = w3.eth.contract(address=UNISWAP_FACTORY, abi=factory_abi)
+router_contract = w3.eth.contract(address=UNISWAP_ROUTER, abi=router_abi)
 decimals = token_contract.functions.decimals().call()
 
 
@@ -126,7 +142,7 @@ def transfer(amount, to_address):
         'gas': 21000,
         'maxFeePerGas': gas_fee[1],
         'maxPriorityFeePerGas': gas_fee[2],
-        'chainId': chainId,
+        'chainId': CHAIN_ID,
     }
     tx_receipt = sign(tx)
     print(f"Transaction has been confirmed. {tx_receipt}") if tx_receipt is not None else print("Check the error.")
@@ -149,7 +165,7 @@ def transfer_erc20(amount, to_address, contract=token_contract):
     gas_estimate = 50000  # I don't know why the estimate_gas() method is not working in test net
     tx = token_contract.functions.transfer(to_address, amount_to_transfer).build_transaction({
         'from': account.address,
-        'chainId': chainId,
+        'chainId': CHAIN_ID,
         'gas': gas_estimate,
         'maxFeePerGas': gas_fee[1],
         'maxPriorityFeePerGas': gas_fee[2],
@@ -175,7 +191,7 @@ def check_price(address1, address2, contract=factory_contract):
     return [reverse0, reverse1]
 
 
-def approve_erc20(amount, address=UNISWAP_V2_TEST_ROUTER_ADDRESS):
+def approve_erc20(amount, address=UNISWAP_ROUTER):
     amount_to_approve = int(amount * (10 ** decimals))
     balance = token_contract.functions.balanceOf(account.address).call()
     print(f"Token Balance: {balance}")
@@ -191,7 +207,7 @@ def approve_erc20(amount, address=UNISWAP_V2_TEST_ROUTER_ADDRESS):
     gas_fee = get_gas_price()
     tx = token_contract.functions.approve(address, amount_to_approve).build_transaction({
         'from': account.address,
-        'chainId': chainId,
+        'chainId': CHAIN_ID,
         'gas': gas_estimate,
         'maxFeePerGas': gas_fee[1],
         'maxPriorityFeePerGas': gas_fee[2],
@@ -231,7 +247,7 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
         deadline
     ).build_transaction({
         'from': account.address,
-        'chainId': chainId,
+        'chainId': CHAIN_ID,
         'gas': gas_estimate,
         'maxFeePerGas': gas_fee[1],
         'maxPriorityFeePerGas': gas_fee[2],
