@@ -33,7 +33,7 @@ RPC_PROVIDERS = {
     }
 }
 RPC_URL = (RPC_PROVIDERS.get(NETWORK, "mainnet")).get(RPC_PROVIDER, "infura")  # Your RPC URL
-GAS_URL = f'https://gas.api.infura.io/v3/{INFURA_API_KEY}/networks//{CHAIN_ID}/suggestedGasFees'
+GAS_URL = f'https://gas.api.infura.io/v3/{INFURA_API_KEY}/networks/{CHAIN_ID}/suggestedGasFees'
 
 # precision adjustment
 """
@@ -274,6 +274,8 @@ def main():
     print("3. Add liquidity")
     print("4. Swap ETH for tokens")
     print("5. Swap tokens for ETH")
+    eth_balance = w3.eth.get_balance(account.address)
+    print(f"ETH balance: {Decimal(eth_balance) / Decimal(10 ** 18)}")
     choice = input("Enter your choice: ")
     if choice == '1':
         amount_eth = amount_input("Enter the amount of ETH to transfer: ")
@@ -308,7 +310,6 @@ def main():
                 amount_eth_desired = amount_token_desired * reverses[1] / reverses[0]
                 print(f"Adjusted ETH amount: {amount_eth_desired}")
 
-        eth_balance = w3.eth.get_balance(account.address)
         token_balance = token_contract.functions.balanceOf(account.address).call()
         total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (
                 1100000 * get_gas_price()[1])  # Adjust based on your values
