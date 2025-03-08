@@ -1,5 +1,4 @@
 import json
-from web3 import Web3
 from eth_abi import decode
 
 # Load UniswapV2 Router ABI
@@ -60,3 +59,4 @@ def parse_univ2_router_tx(tx_data):
         'to': to,
         'deadline': deadline
     }
+

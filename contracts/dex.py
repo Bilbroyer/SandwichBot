@@ -55,7 +55,7 @@ with open(r'abi\UniswapV2Pair.json', 'r') as abi_file:
 
 # address
 TOKEN_ADDRESS = os.getenv("YE")
-WETH_ADDRESS = os.getenv("WETH")
+WETH_ADDRESS = os.getenv("WETH_SEP")
 UNISWAP_ROUTER = os.getenv("UNISWAP_V2_TEST_ROUTER_ADDRESS")
 UNISWAP_FACTORY = os.getenv("UNISWAP_V2_TEST_FACTORY_ADDRESS")
 
@@ -86,8 +86,8 @@ router_contract = w3.eth.contract(address=UNISWAP_ROUTER, abi=router_abi)
 decimals = token_contract.functions.decimals().call()
 
 
-def amount_input(clue):
-    quantity = input(clue)
+def amount_input(prompt=''):
+    quantity = input(prompt)
     try:
         quantity = Decimal(quantity)
     except InvalidOperation:
