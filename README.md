@@ -18,7 +18,7 @@ modify the `config.py` file if necessary
 ### Account
 Generate a keystroke file
 ```shell
-python account.py
+python generate_account.py
 ```
 ⚠️ IMPORTANT SECURITY NOTES:
 - Never share your private key!
