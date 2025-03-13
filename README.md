@@ -20,7 +20,10 @@ Generate a keystroke file
 ```shell
 python account.py
 ```
-⚠️You have to remember your password. If your private key is not saved elsewhere, forgetting your password is equivalent to losing your account.
+⚠️ IMPORTANT SECURITY NOTES:
+- Never share your private key!
+- Keep your password safe and never lose it!
+If you lose your password and never backed up your private key, you will lose access to your account and all the assets in it.
 
 ### Run the bot
 ```shell
