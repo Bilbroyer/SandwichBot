@@ -37,7 +37,7 @@ WSS_PROVIDERS = {
 
 
 WSS_URL = (WSS_PROVIDERS.get(NETWORK, "mainnet")).get(RPC_PROVIDER, "infura")  # Your RPC URL
-UNISWAP_V2_ROUTER_ADDRESS = os.getenv("UNISWAP_V2_ROUTER_ADDRESS")  # UniswapV2 Router address
+UNISWAP_V2_ROUTER_ADDRESS = os.getenv("UNISWAP_V2_TEST_ROUTER_ADDRESS")  # UniswapV2 Router address
 
 transaction_count = 0
 
@@ -46,7 +46,6 @@ async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
     global transaction_count
     str_log_prefix = f"txhash={tx_hash.hex()}"
     # log_trace(str_log_prefix, "received")
-    transaction_count += 1
     if transaction_count % 200 == 0:
         clear_console()
         transaction_count = 0
@@ -67,6 +66,8 @@ async def sandwich_uniswap_v2_router_tx(tx_hash: hex, w3):
     if tx is None:
         return
 
+    transaction_count += 1
+    log_trace(tx['to'])
     if not tx['to'].lower() == UNISWAP_V2_ROUTER_ADDRESS.lower():
         return
 

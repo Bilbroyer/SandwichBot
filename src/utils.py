@@ -1,9 +1,9 @@
 import os, json, random
 from web3.auto import w3
 
-# Clear console
 def clear_console():
     os.system('cls' if os.name == 'nt' else 'clear')
+
 
 def generate_keystore(content, password):
     keystore = w3.eth.account.encrypt(content, password)

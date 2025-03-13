@@ -1,5 +1,5 @@
 {
-  "rpc_provider": "infura",
+  "rpc_provider": "quicknode",
   "network": "sepolia",
   "chain_id": 11155111
 }
