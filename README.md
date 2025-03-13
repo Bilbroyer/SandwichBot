@@ -16,7 +16,7 @@ infura_api_key = your_infura_api_key_here
 modify the `config.py` file if necessary
 
 ### Account
-Generate a keystroke file
+Generate a keystore file
 ```shell
 python generate_account.py
 ```
