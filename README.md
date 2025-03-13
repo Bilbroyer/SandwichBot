@@ -16,7 +16,7 @@ infura_api_key = your_infura_api_key_here
 modify the `config.py` file if necessary
 
 ### Account
-Generate a keystore file
+Generate a new account with keystore file
 ```shell
 python generate_account.py
 ```
