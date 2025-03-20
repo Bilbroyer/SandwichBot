@@ -13,7 +13,7 @@ copy `.env.example` to `.env` and fill in the required information
 ```shell
 infura_api_key = your_infura_api_key_here
 ```
-modify the `config.py` file if necessary
+modify the `config.json` file if necessary
 
 ### Account
 Generate a new account with keystore file
