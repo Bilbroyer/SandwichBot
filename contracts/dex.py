@@ -189,9 +189,9 @@ def check_price(address1, address2, contract=factory_contract):
         print(f"Pool already exists at: {pair_address}")
     pair_contract = w3.eth.contract(address=pair_address, abi=pair_abi)
     pair_reserves = pair_contract.functions.getReserves().call()
-    reverse0, reverse1 = Decimal(pair_reserves[0]), Decimal(pair_reserves[1])
-    print(f"The current price of token1 is: {reverse1 / reverse0} token2")
-    return [reverse0, reverse1]
+    reserve0, reserve1 = Decimal(pair_reserves[0]), Decimal(pair_reserves[1])
+    print(f"The current price of token1 is: {reserve1 / reserve0} token2")
+    return [reserve0, reserve1]
 
 
 # Approve an address to spend a specified amount of ERC20 tokens
@@ -222,7 +222,7 @@ def approve_erc20(amount, address=UNISWAP_ROUTER):
         "Check the error.")
 
 
-# Add liquidity to a Uniswap V2 pool
+# Add liquidity to an Uniswap V2 pool
 def add_liquidity(amount_eth, amount_token, slippage=0.01):
     amount_token_desired = int(amount_token * (10 ** decimals))
     amount_token_min = int(amount_token_desired * (1 - slippage))
@@ -348,20 +348,20 @@ def main():
     elif choice == '3':
         amount_eth_desired = amount_input("Enter the amount of ETH to add: ")
         amount_token_desired = amount_input("Enter the amount of tokens to add: ")
-        reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
-        if reverses is None:
+        reserves = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
+        if reserves is None:
             print("No pool exists, the pair will be created when adding liquidity.")
-        elif reverses[0] == 0 or reverses[1] == 0:
+        elif reserves[0] == 0 or reserves[1] == 0:
             print("One of the reserves is 0.")
         else:
             # Adjust amounts if the desired ratio differs from the current pool ratio
-            if reverses[1] / reverses[0] > amount_eth_desired / amount_token_desired:
+            if reserves[1] / reserves[0] > amount_eth_desired / amount_token_desired:
                 print("The current price is different from the desired price.")
-                amount_token_desired = amount_eth_desired * reverses[0] / reverses[1]
+                amount_token_desired = amount_eth_desired * reserves[0] / reserves[1]
                 print(f"Adjusted token amount: {amount_token_desired}")
-            elif reverses[1] / reverses[0] < amount_eth_desired / amount_token_desired:
+            elif reserves[1] / reserves[0] < amount_eth_desired / amount_token_desired:
                 print("The current price is different from the desired price.")
-                amount_eth_desired = amount_token_desired * reverses[1] / reverses[0]
+                amount_eth_desired = amount_token_desired * reserves[1] / reserves[0]
                 print(f"Adjusted ETH amount: {amount_eth_desired}")
         token_balance = token_contract.functions.balanceOf(account.address).call()
         total_eth_needed = w3.to_wei(amount_eth_desired, 'ether') + (1100000 * get_gas_price()[1])
@@ -376,31 +376,31 @@ def main():
     elif choice == '4':
         amount_token = amount_input("Enter the amount of tokens to swap: ")
         amount_eth = amount_input("Enter the amount of ETH to spend: ")
-        reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
-        if reverses is None:
+        reserves = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
+        if reserves is None:
             print("No pool exists, the pair will be created when adding liquidity.")
-        elif reverses[0] == 0 or reverses[1] == 0:
+        elif reserves[0] == 0 or reserves[1] == 0:
             print("One of the reserves is 0.")
         else:
             # Adjust amounts if the desired ratio differs from the current pool ratio
-            if reverses[1] / reverses[0] != amount_eth / amount_token:
+            if reserves[1] / reserves[0] != amount_eth / amount_token:
                 print("The current price is different from the desired price.")
-                amount_eth = amount_token * reverses[1] / reverses[0]
+                amount_eth = amount_token * reserves[1] / reserves[0]
                 print(f"Adjusted ETH amount: {amount_eth}")
         swap_eth_for_exact_tokens(amount_token, amount_eth)
     elif choice == '5':
         amount_token = amount_input("Enter the amount of tokens to swap: ")
         amount_eth = amount_input("Enter the amount of ETH to spend: ")
-        reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
-        if reverses is None:
+        reserves = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
+        if reserves is None:
             print("No pool exists, the pair will be created when adding liquidity.")
-        elif reverses[0] == 0 or reverses[1] == 0:
+        elif reserves[0] == 0 or reserves[1] == 0:
             print("One of the reserves is 0.")
         else:
             # Adjust amounts if the desired ratio differs from the current pool ratio
-            if reverses[1] / reverses[0] != amount_eth / amount_token:
+            if reserves[1] / reserves[0] != amount_eth / amount_token:
                 print("The current price is different from the desired price.")
-                amount_eth = amount_token * reverses[1] / reverses[0]
+                amount_eth = amount_token * reserves[1] / reserves[0]
                 print(f"Adjusted ETH amount: {amount_eth}")
         swap_exact_tokens_for_eth(amount_token, amount_eth)
 
