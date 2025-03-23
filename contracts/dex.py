@@ -154,8 +154,7 @@ def transfer_erc20(amount, to_address, contract=token_contract):
     balance = w3.eth.get_balance(account.address)
     gas_fee = get_gas_price()
     print(f"Token Balance: {balance_token}")
-    if balance_token < amount_to_transfer or 50000 * gas_fee[
-        1] < balance:  # check if you have enough balance, including the gas fee
+    if balance_token < amount_to_transfer or 50000 * gas_fee[1] < balance:  # check if you have enough balance, including the gas fee
         print(
             f"Insufficient balance: {balance_token} token, needed: {amount_to_transfer} token; {balance} wei, needed: {50000 * gas_fee[1]} wei")
         return
@@ -260,12 +259,87 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
 
 
 def swap_eth_for_exact_tokens(amount_token, amount_eth, slippage=0.01):
-    
-    pass
+    # Normalize amounts to blockchain units
+    amount_token_out = int(amount_token * (10 ** decimals))  # Token amount in smallest unit (wei-like)
+    amount_eth_max = w3.to_wei(amount_eth, 'ether')
+    amount_eth_max_with_slippage = int(amount_eth_max * (1 + slippage))
+
+    gas_fee = get_gas_price()
+    gas_estimate = 200000
+    total_eth_needed = amount_eth_max_with_slippage + gas_estimate * gas_fee[1]
+
+    eth_balance = w3.eth.get_balance(account.address)
+    if eth_balance < total_eth_needed:
+        print(f"Insufficient ETH balance: {eth_balance} wei, needed: {total_eth_needed} wei")
+        return
+
+    # Set swap path and deadline
+    path = [WETH_ADDRESS, TOKEN_ADDRESS]
+    deadline = int(time.time() + gas_fee[1] / 500)  # This time is in milliseconds
+
+    tx = router_contract.functions.swapETHForExactTokens(
+        amount_token_out,
+        path,
+        account.address,
+        deadline
+    ).build_transaction({
+        'from': account.address,
+        'value': amount_eth_max_with_slippage,
+        'gas': gas_estimate,
+        'maxFeePerGas': gas_fee[1],
+        'maxPriorityFeePerGas': gas_fee[2],
+        'nonce': w3.eth.get_transaction_count(account.address),
+        'chainId': CHAIN_ID
+    })
+
+    tx_receipt = sign(tx)
+    print(f"Transaction has been confirmed. {tx_receipt}") if tx_receipt is not None else print("Check the error.")
 
 
 def swap_exact_tokens_for_eth(amount_token, amount_eth, slippage=0.01):
-    pass
+    # Normalize amounts to blockchain units
+    amount_token_in = int(amount_token * (10 ** decimals))  # Token amount in smallest unit (wei-like)
+    amount_eth_min = w3.to_wei(amount_eth, 'ether')
+    amount_eth_min_with_slippage = int(amount_eth_min * (1 - slippage))  # Apply slippage to min ETH
+
+    gas_fee = get_gas_price()
+    gas_estimate = 200000
+    total_eth_needed = gas_estimate * gas_fee[1]  # Only gas fee is needed in ETH
+
+    # Check token and ETH balances
+    token_balance = token_contract.functions.balanceOf(account.address).call()
+    eth_balance = w3.eth.get_balance(account.address)
+    if token_balance < amount_token_in:
+        print(f"Insufficient token balance: {token_balance}, needed: {amount_token_in}")
+        return
+    if eth_balance < total_eth_needed:
+        print(f"Insufficient ETH balance for gas: {eth_balance} wei, needed: {total_eth_needed} wei")
+        return
+
+    # Approve tokens for the router
+    approve_erc20(amount_token)  # Approve the exact token amount
+
+    # Set swap path and deadline
+    path = [TOKEN_ADDRESS, WETH_ADDRESS]  # Path: token -> WETH -> ETH
+    deadline = int(time.time() + 600)  # 10 minutes deadline
+
+    tx = router_contract.functions.swapExactTokensForETH(
+        amount_token_in,
+        amount_eth_min_with_slippage,
+        path,
+        account.address,
+        deadline
+    ).build_transaction({
+        'from': account.address,
+        'gas': gas_estimate,
+        'maxFeePerGas': gas_fee[1],
+        'maxPriorityFeePerGas': gas_fee[2],
+        'nonce': w3.eth.get_transaction_count(account.address),
+        'chainId': CHAIN_ID
+    })
+
+    tx_receipt = sign(tx)
+    print(f"Transaction has been confirmed. {tx_receipt}") if tx_receipt is not None else print("Check the error.")
 
 
 def main():
