@@ -374,7 +374,35 @@ def main():
         approve_erc20(amount_token_desired)
         add_liquidity(amount_eth_desired, amount_token_desired)
     elif choice == '4':
-        pass  # TODO: Implement swap_eth_for_exact_tokens
+        amount_token = amount_input("Enter the amount of tokens to swap: ")
+        amount_eth = amount_input("Enter the amount of ETH to spend: ")
+        reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
+        if reverses is None:
+            print("No pool exists, the pair will be created when adding liquidity.")
+        elif reverses[0] == 0 or reverses[1] == 0:
+            print("One of the reserves is 0.")
+        else:
+            # Adjust amounts if the desired ratio differs from the current pool ratio
+            if reverses[1] / reverses[0] != amount_eth / amount_token:
+                print("The current price is different from the desired price.")
+                amount_eth = amount_token * reverses[1] / reverses[0]
+                print(f"Adjusted ETH amount: {amount_eth}")
+        swap_eth_for_exact_tokens(amount_token, amount_eth)
+    elif choice == '5':
+        amount_token = amount_input("Enter the amount of tokens to swap: ")
+        amount_eth = amount_input("Enter the amount of ETH to spend: ")
+        reverses = check_price(TOKEN_ADDRESS, WETH_ADDRESS)
+        if reverses is None:
+            print("No pool exists, the pair will be created when adding liquidity.")
+        elif reverses[0] == 0 or reverses[1] == 0:
+            print("One of the reserves is 0.")
+        else:
+            # Adjust amounts if the desired ratio differs from the current pool ratio
+            if reverses[1] / reverses[0] != amount_eth / amount_token:
+                print("The current price is different from the desired price.")
+                amount_eth = amount_token * reverses[1] / reverses[0]
+                print(f"Adjusted ETH amount: {amount_eth}")
+        swap_exact_tokens_for_eth(amount_token, amount_eth)
 
 
 if __name__ == "__main__":
