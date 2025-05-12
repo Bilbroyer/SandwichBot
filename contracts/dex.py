@@ -1,12 +1,14 @@
-from web3 import Web3
-from dotenv import load_dotenv
-from src.utils import *
-from src.logs import *
-import requests
-import tkinter as tk
-from tkinter import simpledialog
-from decimal import Decimal, getcontext, InvalidOperation
 import time
+import tkinter as tk
+from decimal import Decimal, getcontext, InvalidOperation
+from tkinter import simpledialog
+
+import requests
+from dotenv import load_dotenv
+from web3 import Web3
+
+from src.logs import *
+from src.utils import *
 
 # Load environment variables from .env file in the root directory
 load_dotenv()
@@ -222,7 +224,7 @@ def approve_erc20(amount, address=UNISWAP_ROUTER):
         "Check the error.")
 
 
-# Add liquidity to an Uniswap V2 pool
+# Add liquidity to a Uniswap V2 pool
 def add_liquidity(amount_eth, amount_token, slippage=0.01):
     amount_token_desired = int(amount_token * (10 ** decimals))
     amount_token_min = int(amount_token_desired * (1 - slippage))
@@ -230,7 +232,7 @@ def add_liquidity(amount_eth, amount_token, slippage=0.01):
     amount_eth_min = int(amount_eth_wei * (1 - slippage))
     gas_estimate = 1000000  # Manual gas estimate
     gas_fee = get_gas_price()
-    deadline = int(time.time() + gas_fee[0] / 500)  # Set deadline based on estimated wait time
+    deadline = int(time.time() + gas_fee[0] / 1000 + 60)  # Set deadline based on estimated wait time
     tx = router_contract.functions.addLiquidityETH(
         TOKEN_ADDRESS,
         amount_token_desired,
@@ -264,7 +266,7 @@ def swap_eth_for_exact_tokens(amount_token, amount_eth, slippage=0.01):
         print(f"Insufficient ETH balance: {eth_balance} wei, needed: {total_eth_needed} wei")
         return
     path = [WETH_ADDRESS, TOKEN_ADDRESS]
-    deadline = int(time.time() + gas_fee[0] / 500)
+    deadline = int(time.time() + gas_fee[0] / 1000 + 60)
     tx = router_contract.functions.swapETHForExactTokens(
         amount_token_out,
         path,
@@ -301,7 +303,7 @@ def swap_exact_tokens_for_eth(amount_token, amount_eth, slippage=0.01):
         return
     approve_erc20(amount_token)
     path = [TOKEN_ADDRESS, WETH_ADDRESS]
-    deadline = int(time.time() + gas_fee[0] / 500)
+    deadline = int(time.time() + gas_fee[0] / 1000 + 60)
     tx = router_contract.functions.swapExactTokensForETH(
         amount_token_in,
         amount_eth_min_with_slippage,
