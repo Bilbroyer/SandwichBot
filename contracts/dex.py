@@ -147,7 +147,7 @@ def transfer(amount, to_address):
         'nonce': w3.eth.get_transaction_count(account.address),
         'to': to_address,
         'value': amount_to_transfer,
-        'gas': 21000,  # Standard gas limit for ETH transfer
+        'gas': 31500,  # Standard gas limit for ETH transfer
         'maxFeePerGas': gas_fee[1],
         'maxPriorityFeePerGas': gas_fee[2],
         'chainId': CHAIN_ID,
