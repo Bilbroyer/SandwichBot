@@ -19,44 +19,51 @@ def get_function_signature_mapping(abi):
 function_signatures = get_function_signature_mapping(uniswap_v2_router_abi)
 
 # Helper function to decode UniswapV2 Router transaction data
-def parse_univ2_router_tx(tx_data):
-    # Remove '0x' from tx data and get the first 4 bytes (the method selector)
-    method_selector = str(tx_data.hex())[:8]
+def parse_univ2_router_tx(tx_data: str):
+    """Parse a UniswapV2 Router transaction input.
 
-    # Check if the method
+    Parameters
+    ----------
+    tx_data: str
+        Hex string of the transaction input data.
+    Returns
+    -------
+    dict
+        Parsed transaction information.
+    """
+
+    # remove `0x` prefix if present and extract the first 4 bytes (8 hex chars)
+    tx_data = tx_data[2:] if tx_data.startswith("0x") else tx_data
+    method_selector = tx_data[:8]
+
     if method_selector not in uniswap_v2_router_methods:
         return {
-            'method': None,
-            'availability': False
+            "method": None,
+            "availability": False,
         }
 
-    method = uniswap_v2_router_methods.get(method_selector)
+    method = uniswap_v2_router_methods[method_selector]
 
-    if method[:4] != 'swap':
+    if not method.startswith("swap"):
         return {
-            'method': method,
-            'availability': False
+            "method": method,
+            "availability": False,
         }
 
-    return {
-        'method': method,
-        'availability': False
-    }
-
-    # Decode parameters
+    # Decode parameters of swap methods
     decoded_params = decode(
-        ['uint256', 'address[]', 'address', 'uint256'],  # The parameters for 'swapExactETHForTokens'
-        bytes.fromhex(tx_data[10:])  # Strip the first 4 bytes (method selector)
+        ["uint256", "address[]", "address", "uint256"],
+        bytes.fromhex(tx_data[8:]),
     )
 
     amount_out_min, path, to, deadline = decoded_params
 
     return {
-        'availability': True,
-        'method': method,
-        'amountOutMin': amount_out_min,
-        'path': path,
-        'to': to,
-        'deadline': deadline
+        "availability": True,
+        "method": method,
+        "amountOutMin": amount_out_min,
+        "path": path,
+        "to": to,
+        "deadline": deadline,
     }
 
